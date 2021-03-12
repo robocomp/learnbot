@@ -1053,7 +1053,7 @@ class Typechecker(Context):
 class Parser:
     @staticmethod
     def parse_str(text):
-        return LB.parseString(text, parseAll = True)[0]
+        return LB.parseString(text, parseAll=True)[0]
 
 # ini = []
 usedFunctions = []
@@ -1068,62 +1068,16 @@ def parserLearntBotCodeOnlyUserFuntion(code):
         traceback.print_exc()
     return text
 
-def parserLearntBotCode(inputFile, outputFile, client_name):
+def parserLearntBotCode(input_filename, output_filename, client_name):
     global usedFunctions
 
-    notifications = []
+    with open(input_filename) as input_file:
+        code = input_file.read()
+        full_text, notifications = parserLearntBotCodeFromCode(code, client_name)
+        with open(output_filename, 'w') as output_file:
+            output_file.write(full_text)
+        return full_text, notifications
 
-    with open(inputFile) as f:
-        code = f.read()
-
-        try:
-            output = Parser.parse_str(code)
-            mismatches = Typechecker.check(output)
-
-            text = elapsedTimeFunction.replace("<TABHERE>", '\t')
-            text += signalHandlerFunction.replace("<TABHERE>", '\t')
-            text += PythonGenerator.generate(output)
-            text += endOfProgram
-
-            for mismatch in mismatches:
-                node, got, expected = mismatch
-
-                notifications.append(TypeMismatch(
-                    src = code,
-                    start = node.start,
-                    end = node.end,
-                    expected = expected.__name__,
-                    got = got.__name__
-                ))
-
-            header = HEADER.replace('<Client>', client_name).replace("<USEDCALLS>", str(usedFunctions)).replace("<TABHERE>", '\t')
-
-            with open(outputFile, 'w') as f:
-                f.write(header)
-                f.write(text)
-
-            return header + text, notifications
-        except ParseSyntaxException as pe:
-            traceback.print_exc()
-
-            print("=================================")
-            print("ParseSyntaxException 1")
-            print("=================================")
-            print(pe.__dict__)
-
-            notifications.append(InvalidSyntax(
-                src = code,
-                start = (pe.lineno, pe.col, pe.loc)
-            ))
-            return None, notifications
-        except ParseException as pe:
-            traceback.print_exc()
-
-            notifications.append(InvalidSyntax(
-                src = code,
-                start = (pe.lineno, pe.col, pe.loc)
-            ))
-            return None, notifications
 
 def parserLearntBotCodeFromCode(code, name_client):
     global usedFunctions
@@ -1134,97 +1088,37 @@ def parserLearntBotCodeFromCode(code, name_client):
         output = Parser.parse_str(code)
         mismatches = Typechecker.check(output)
 
-        text = elapsedTimeFunction.replace("<TABHERE>", '\t')
-        text += signalHandlerFunction.replace("<TABHERE>", '\t')
-        text += PythonGenerator.generate(output)
-        text += endOfProgram
+        body_text = elapsedTimeFunction.replace("<TABHERE>", '\t')
+        body_text += signalHandlerFunction.replace("<TABHERE>", '\t')
+        body_text += PythonGenerator.generate(output)
+        body_text += endOfProgram
         header = HEADER.replace('<Client>', name_client).replace("<USEDCALLS>", str(usedFunctions)).replace("<TABHERE>", '\t')
 
         for mismatch in mismatches:
             node, got, expected = mismatch
 
             notifications.append(TypeMismatch(
-                src = code,
-                start = node.start,
-                end = node.end,
-                expected = expected.__name__,
-                got = got.__name__
+                src=code,
+                start=node.start,
+                end=node.end,
+                expected=expected.__name__,
+                got=got.__name__
             ))
 
-        return header + text, notifications
-    except ParseSyntaxException as pe:
-        traceback.print_exc()
-
-        notifications.append(InvalidSyntax(
-            src = code,
-            start = (pe.lineno, pe.col, pe.loc),
-            rule = Node.last_statement()
-        ))
-        return None, notifications
-    except ParseException as pe:
+        return header + body_text, notifications
+    except (ParseSyntaxException, ParseException) as pe:
         traceback.print_exc()
         notifications.append(InvalidSyntax(
-            src = code,
-            start = (pe.lineno, pe.col, pe.loc),
-            rule = Node.last_statement()
+            src=code,
+            start=(pe.lineno, pe.col, pe.loc),
+            rule=Node.last_statement()
         ))
         return None, notifications
 
 if __name__ == "__main__":
-    textprueba = """
-
-
-main:
-    x = 2
-end
-
-"""
-    try:
-        print("Original source code")
-        print("====================")
-        print()
-        print(textprueba)
-        print()
-
-        print("Parse tree")
-        print("==========")
-        print()
-        tree = Parser.parse_str(textprueba)
-        print(tree.__dict__)
-        print()
-
-        print("Global variables")
-        print("================")
-        print()
-        print(tree.used_vars)
-        print()
-
-        print("Python result")
-        print("=============")
-        print()
-        print(PythonGenerator.generate(tree))
-        print()
-
-        print("Typechecks?")
-        print("==========")
-        print()
-        mismatches = Typechecker.check(tree)
-        print(not mismatches)
-        print()
-
-        print("Type mismatches")
-        print("===============")
-        print()
-        print(mismatches)
-        print()
-        parserLearntBotCodeFromCode(textprueba, "robots")
-    except Exception as pe:
-        print(pe.line)
-        print(' ' * (pe.col - 1) + '^')
-        print(pe)
 
     argv = sys.argv[1:]
-    if len(argv) is not 3:
+    if len(argv) != 3:
         print(bcolors.FAIL + "You must give 2 arguments")
         print("\timputfile\tFile to parser")
         print("\toutputfile\tFile to parser")
